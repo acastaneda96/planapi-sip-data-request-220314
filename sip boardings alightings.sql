@@ -4,8 +4,8 @@ Author: Tony
 Data Request: 
 
 •	To determine Jobs accessible via 30 minutes on transit, the following to identify appropriate origin nodes - dm for rail, hmbrw for bus
-DONE    o	Metrorail passenger boardings, weekday AM peak, weekday PM peak, by station
-IN PROGRESS    o	Metrobus passenger boardings, weekday AM peak, weekday PM peak, by stop
+    o	Metrorail passenger boardings, weekday AM peak, weekday PM peak, by station (avg weekday)
+IN PROGRESS    o	Metrobus passenger boardings, weekday AM peak, weekday PM peak, by stop (avg weekday)
 DONE    o	GIS references (such as lat/long) for the above Metrorail station and Metrobus stops - ?
 
 Time Range - Oct 2019 / Sep-Oct 2021 including new service changes (9/5), excluding 7k suspension (8/17)
@@ -25,8 +25,9 @@ with rail_week_per as (
          , period
          , station
          , b.id --MSTN ID (STATION ID)
-         , sum(entry_cnt + transfer_cnt) as boardings
-         , sum(exit_cnt) as alightings
+         , sum(entry_cnt + transfer_cnt)/count(distinct dateday) as avg_boardings
+         , sum(exit_cnt)/count(distinct dateday) as avg_alightings
+         , count(distinct dateday) as day_count
     from planapi.dm_rail_ridership_v a
     left join planapi.rail_net_station_xy_v b on b.name_od = a.station
     where servicetype = 'Weekday' and yearmo in (201910, 202109, 202110)
@@ -35,13 +36,13 @@ with rail_week_per as (
     and period in ('AM Peak', 'PM Peak') and Holiday = 'No'
     group by yearmo, servicetype, period, station, b.id
     order by yearmo, period
-) select * from rail_week_per;
+) select * from rail_week_per; --29 sec
 
 
---select * from planapi.bus_state_stop_sequence_v;
-select * from planapi.bus_state_pax_load_hmbrw_l 
-where svc_date = to_date('2021-09-06', 'YYYY-MM-DD');
-select * from planapi.d_timeperiod_bus_hr_v;
+--select * from planprod.hmbrw_pax_load
+--where svc_date = to_date('2021-09-06', 'YYYY-MM-DD');
+--select * from planapi.d_timeperiod_bus_hr_v;
+--select * from planprod.hmbrw_bus_sched_stop_times;
 
 --    HMBRW VS SCHED_STOP_SEQUENCE  --
 --    route_id = pattern_id
@@ -59,13 +60,14 @@ with bus_week_per as(
         , h.route_id
         , h.route_id_substr
         , h.stop_sequence
-        , sum(stop_front_door_entry + stop_back_door_entry) as boardings
-        , sum(stop_front_door_exit + stop_back_door_exit) as alightings
+        , sum(stop_front_door_entry + stop_back_door_entry)/count(distinct svc_date) as avg_boardings
+        , sum(stop_front_door_exit + stop_back_door_exit)/count(distinct svc_date) as avg_alightings
+        , count(distinct svc_date) as day_count
     from (
         select svc_date
              , event_dtm
              , to_char(event_dtm, 'HH24') as hh24
-             , bus_id
+--             , bus_id
              , route_id
              , route_id_substr
              , stop_sequence
@@ -73,11 +75,11 @@ with bus_week_per as(
              , stop_back_door_entry
              , stop_front_door_exit
              , stop_back_door_exit
-        from planapi.bus_state_pax_load_hmbrw_l -- HMBRW boarding counts / service date / yearmo
-        where svc_date between to_date('2019-10-01', 'YYYY-MM-DD') and to_date('2019-10-31', 'YYYY-MM-DD')
-          or (svc_date between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-30', 'YYYY-MM-DD'))
-          or (svc_date between to_date('2021-10-01', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD'))
-        ) h 
+        from planprod.hmbrw_pax_load -- HMBRW BOARDING COUNTS / SERVICE DATE / YEARMO
+        where nonrev_flag = 0 and (svc_date between to_date('2019-10-01', 'YYYY-MM-DD') and to_date('2019-10-31', 'YYYY-MM-DD')
+--          or (svc_date between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-30', 'YYYY-MM-DD'))--NEED TO OMIT DATES BEFORE SEP SERVICE CHANGES
+--          or (svc_date between to_date('2021-10-01', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD'))--NEED TO OMIT DATES AFTER 7K SUSPENSION
+        )) h 
     
     left join
         (select yearmo
@@ -85,7 +87,7 @@ with bus_week_per as(
             , date_day_type
             , date_holiday
          from planapi.d_date_bus_v -- BUS DAY TYPE / HOLIDAYS
-         where yearmo in (201910, 202109, 202110)
+         where yearmo in (201910)--, 202109, 202110)
          ) c on c.dateday = to_date(h.svc_date)
    
     left join  
@@ -100,11 +102,12 @@ with bus_week_per as(
                , stop_sequence
                , reg_id
                , geostopid
-         from planapi.bus_sched_stop_sequence_v) g --IDS FOR BUS
+         from planapi.bus_sched_stop_sequence_v --planprod version only goes 
+         where versionid in (69)) g --IDS FOR BUS (69, 85))
      on h.route_id = g.pattern_id and h.route_id_substr = g.route and h.stop_sequence = g.stop_sequence
      
      group by c.yearmo
-            , c.date_day_type
+            , c.date_day_type 
             , c.date_holiday
             , tp.period
             , g.reg_id
@@ -114,8 +117,7 @@ with bus_week_per as(
             , h.route_id_substr
             , h.stop_sequence
      order by yearmo, svc_date, route_id, route_id_substr, stop_sequence, period
-) 
-;
+) select * from bus_week_per;
 
 --Check for the correct version type for 201910 / 2021 09 / 10
 --Time Range - Oct 2019 / Sep-Oct 2021 including new service changes (9/5), excluding 7k suspension (8/17)
@@ -126,7 +128,6 @@ select * from planapi.bus_sched_stop_sequence_v where versionid in (69,70,85) or
 select versionid, versionname, version_start_date, version_end_date from planapi.bus_sched_version_v 
 where versionid in (69,70,85);
 --Version 69 = 201910  10/01-10/19
---Version 70 = 201910 10/20-10/31
 --Version 85 = 202109 and 202110!!!!!!!!!
 
 
