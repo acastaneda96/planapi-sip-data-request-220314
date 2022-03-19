@@ -4,7 +4,7 @@ Author: Tony
 Data Request: 
 •	Passenger Trip transfers, by Metrorail line, Metrobus route
 IN PROGRESS    o	Share (%) of total rider boarding with a transfer - dm transfers
-        peak/off peak is probably a good idea, since it can be asymmetrical.
+     ***peak/off peak is probably a good idea, since it can be asymmetrical.***
         the transfer datamarts (not Trace, the ones that are dm_xfer…) to get the number of transfers by line. 
         You might also need to pull the total ridership by line to get the percentages.
 
@@ -13,6 +13,7 @@ excluding:
   sep 1 - 5
   oct 18 - 31
 *******************/
+
 
 with rail_week_per as ( 
     select yearmo 
@@ -39,7 +40,7 @@ with rail_week_per as (
     order by yearmo, station
 ) 
 
-
+;
 with bus_week_per as( 
 --, bus_prep as (
     select c.yearmo
@@ -94,7 +95,7 @@ with bus_week_per as(
            , stop_sequence
            , lat
            , lon
-      from planapi.bus_state_stop_sequence_v) g
+      from planapi.bus_state_stop_sequence_v) g --to connect to GIS
       on h.route_id = g.route_id and h.stop_sequence = g.stop_sequence
     
      group by c.yearmo
@@ -131,6 +132,7 @@ and svc_date not between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-0
 and svc_date not between to_date('2021-10-18', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD')
 ) -- IT WORKED! 249 SECONDS -- well it worked before i added in the stop_sequence join, we'll see how it goes now
 
+select * from bus_week_per;
 
 --select * from planapi.dm_xfers_b2r_v where yearmo = 201910;
 --select * from planapi.dm_xfers_r2b_v where yearmo = 201910;
