@@ -50,9 +50,7 @@ with rail_week_per as (
 
 with bus_week_per as( 
     select h.date_year_month
-        , h.svc_date
         , h.date_holiday
-        , h.date_service_type
         , tp.period
         , h.reg_id
         , h.route_id
@@ -89,9 +87,7 @@ with bus_week_per as(
      on h.hh24 = tp.period_hour
      
      group by h.date_year_month
-            , h.svc_date
             , h.date_holiday
-            , h.date_service_type
             , tp.period
             , h.reg_id
             , h.route_id
@@ -102,7 +98,6 @@ with bus_week_per as(
 ) --select * from bus_week_per; --141 sec
 
 select date_year_month
-     , date_service_type
      , period
      , reg_id 
      , route_id

@@ -27,7 +27,7 @@ with rail_week_per as (
     from planapi.dm_rail_ridership_v a
     left join planapi.rail_net_station_xy_v b on b.name_od = a.station
     where servicetype = 'Weekday' and Holiday = 'No' and yearmo in (201910, 202109, 202110)
-    and dateday != to_date('2010-10-01', 'YYYY-MM-DD') 
+    and dateday != to_date('2019-10-01', 'YYYY-MM-DD')  -- Thanks Sydney! Yes 2019
     and dateday not between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-05', 'YYYY-MM-DD')
     and dateday not between to_date('2021-10-18', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD')
     
@@ -38,7 +38,7 @@ with rail_week_per as (
                 , station
                 , b.id
     order by yearmo, station
-) 
+) --select * from rail_week_per;
 
 , bus_prep as( 
     select h.date_year_month
@@ -79,13 +79,16 @@ with rail_week_per as (
             , h.date_holiday
             , h.date_service_type
             , tp.period
-            , h.reg_id
-            , h.route_id
+            --, h.reg_id
+            --, h.route_id
             , h.route
-            , h.I_stop_sequence
-            , h.place_name
-     order by date_year_month, svc_date, route_id, route, I_stop_sequence, period
-) --select * from bus_prep; --141 sec
+           -- , h.I_stop_sequence
+            --, h.place_name
+     order by date_year_month, svc_date, --route_id, 
+     route, 
+     --I_stop_sequence, 
+     period
+) --select * from bus_prep; --141 sec; 85 secs when comment out extra fields
 
 , bus_week_per as (
 select date_year_month as yearmo
@@ -112,7 +115,7 @@ select * from bus_week_per
 
 --B2R xfers
 --with b2r as (
- , b2r as (
+, b2r as (
 select tfr_type 
 --     , to_rail_station as tfr_to_name
      , to_char(to_mstn_id) as tfr_to
@@ -125,7 +128,9 @@ select tfr_type
      , sum(trans_count)/count(distinct dateday) as avg_transfers
 from planapi.dm_xfers_b2r_v
 where date_day_type = 'Weekday' and date_holiday = 'No' and yearmo in (201910, 202109, 202110)
-and dateday != to_date('2010-10-01', 'YYYY-MM-DD') 
+and from_operator_id = 21 --metrobus
+and to_operator_id = 22 --metrorail
+and dateday != to_date('2019-10-01', 'YYYY-MM-DD') 
 and dateday not between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-05', 'YYYY-MM-DD')
 and dateday not between to_date('2021-10-18', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD')
 group by tfr_type
@@ -155,7 +160,9 @@ select tfr_type
      , sum(trans_count)/count(distinct dateday) as avg_transfers
 from planapi.dm_xfers_r2b_v
 where date_day_type = 'Weekday' and date_holiday = 'No' and yearmo in (201910, 202109, 202110)
-and dateday != to_date('2010-10-01', 'YYYY-MM-DD') and to_route_alpha is not null
+and from_operator_id = 22 --metrorail 
+and to_operator_id = 21 --metrobus
+and dateday != to_date('2019-10-01', 'YYYY-MM-DD')  -- QA Sydney: again I think you mean 2019 here
 and dateday not between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-05', 'YYYY-MM-DD')
 and dateday not between to_date('2021-10-18', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD')
 group by tfr_type
@@ -175,6 +182,8 @@ order by yearmo, to_route_alpha, peak desc
 --distinct alpha 271
 --distinct bus route number 369
 
+--transaction number
+
 --B2B xfers
 -- with b2b as (
 , b2b as (
@@ -190,8 +199,9 @@ select tfr_type
      , sum(trans_count)/count(distinct dateday) as avg_transfers
 from planapi.dm_xfers_b2b_v
 where date_day_type = 'Weekday' and date_holiday = 'No' and yearmo in (201910, 202109, 202110)
-and to_route_alpha is not null
-and dateday != to_date('2010-10-01', 'YYYY-MM-DD') 
+and from_operator_id = 21 --metrobus
+and to_operator_id = 21 --metrobus
+and dateday != to_date('2019-10-01', 'YYYY-MM-DD')  -- QA Sydney: again I think you mean 2019 here
 and dateday not between to_date('2021-09-01', 'YYYY-MM-DD') and to_date('2021-09-05', 'YYYY-MM-DD')
 and dateday not between to_date('2021-10-18', 'YYYY-MM-DD') and to_date('2021-10-31', 'YYYY-MM-DD')
 group by tfr_type
